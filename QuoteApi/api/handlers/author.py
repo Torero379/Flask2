@@ -6,7 +6,10 @@ from api.models.author import AuthorModel
 @app.post("/authors")
 def create_author():
     author_data = request.json
+
     try:
+        if "surname" not in author_data:
+            author_data["surname"]="-" 
         author = AuthorModel(**author_data)
         db.session.add(author)
         db.session.commit()
@@ -15,6 +18,8 @@ def create_author():
     except Exception as e:
         abort(503, f"Database error: {str(e)}")
     return jsonify(author.to_dict()), 201
+   
+
 
 @app.get("/authors")
 def get_authors():
