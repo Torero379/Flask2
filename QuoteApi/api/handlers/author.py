@@ -39,3 +39,12 @@ def get_author_by_id(author_id: int):
     return jsonify(quote.to_dict()), 200
 
 
+
+@app.put("/authors/<int:authors_id>")
+def edit_authors(authors_id: int):
+    new_data = request.json
+    author = db.get_or_404(entity=AuthorModel, ident=authors_id, description=f"Quote with id={authors_id} not found")
+    for key_as_attr, value in new_data.items():
+        setattr(author, key_as_attr, value)
+    db.session.commit()
+    return jsonify(author.to_dict()), 200   
