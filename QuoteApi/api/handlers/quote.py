@@ -92,7 +92,6 @@ def edit_quote(quote_id: int):
 
 @app.route("/quotes/<int:quote_id>", methods=['DELETE'])
 def delete_quote(quote_id):
-    """Delete quote by id """
     quote = db.get_or_404(entity=QuoteModel, ident=quote_id, description=f"Quote with id={quote_id} not found")
     db.session.delete(quote)
     try:
@@ -112,3 +111,5 @@ def filter_quotes():
         abort(400, f"Invalid data. Required: <author> and <text>. Received: {', '.join(data.keys())}")
     
     return jsonify([quote.to_dict() for quote in quotes]), 200
+
+
