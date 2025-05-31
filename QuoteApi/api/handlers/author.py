@@ -1,6 +1,7 @@
 from api import db, app
 from flask import request, abort, jsonify
 from api.models.author import AuthorModel
+from sqlalchemy.exc import SQLAlchemyError
 
 
 @app.post("/authors")
@@ -48,3 +49,16 @@ def edit_authors(authors_id: int):
         setattr(author, key_as_attr, value)
     db.session.commit()
     return jsonify(author.to_dict()), 200   
+
+
+@app.route("/authors/<int:authors_id>", methods=['DELETE'])
+def delete_author(authors_id):
+    """Delete quote by id """
+    author = db.get_or_404(entity=AuthorModel, ident=authors_id, description=f"Author with id={authors_id} not found")
+    db.session.delete(author)
+    try:
+        db.session.commit()
+        return jsonify({"message": f"Quote with id {authors_id} has deleted."}), 200
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        abort(503, f"Database error: {str(e)}")
