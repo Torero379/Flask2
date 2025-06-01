@@ -5,17 +5,15 @@ from api.models.author import AuthorModel
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError, InvalidRequestError
 from . import check
+from api.schemas.quote import quote_schema, quotes_schema
 
-
-@app.get("/quotes")
+@app.get("/quotes") ##+
 def get_quotes():
     """ Функция возвращает все цитаты из БД. """
     quotes_db = db.session.scalars(db.select(QuoteModel)).all()
     # Формируем список словарей
-    quotes = []
-    for quote in quotes_db:
-        quotes.append(quote.to_dict())
-    return jsonify(quotes), 200
+
+    return jsonify(quotes_schema.dump(quotes_db)),200
 
 
 # URL: "/authors/<int:author_id>/quotes"
@@ -37,11 +35,11 @@ def author_quotes(author_id: int):
         abort(405)
 
 
-@app.get("/quotes/<int:quote_id>")
+@app.get("/quotes/<int:quote_id>")  ##|+
 def get_quote_by_id(quote_id: int):
     """ Return quote by id from db."""
     quote = db.get_or_404(entity=QuoteModel, ident=quote_id, description=f"Quote with id={quote_id} not found")
-    return jsonify(quote.to_dict()), 200
+    return jsonify(quote_schema.dump(quote)),200
 
 
 
@@ -55,18 +53,19 @@ def get_quotes_count() -> int:
 @app.post("/quotes")
 def create_quote():
     """ Function creates new quote and adds it to db."""
-    data = request.json
+    
     try:
-        quote = QuoteModel(**data)
+        quote = quote_schema.load(request.json)
+        
         db.session.add(quote)
         db.session.commit()
     except TypeError:
-        abort(400, f"Invalid data. Required: <author> and <text>. Received: {', '.join(data.keys())}")
+        abort(400, f"Invalid data. Required: <author> and <text>. Received: {', '.join(quote.keys())}")
     except Exception as e:
         abort(503, f"Database error: {str(e)}")
     
-    return jsonify(quote.to_dict()), 201
-    
+    return jsonify(quote_schema.dump(quote)), 201  
+   
 
 
 @app.put("/quotes/<int:quote_id>")
