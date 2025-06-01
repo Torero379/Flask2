@@ -2,6 +2,7 @@ from api import db, app
 from flask import request, abort, jsonify
 from api.models.author import AuthorModel
 from sqlalchemy.exc import SQLAlchemyError
+from api.schemas.author import author_schema, authors_schema
 
 
 @app.post("/authors")
@@ -25,18 +26,19 @@ def create_author():
 @app.get("/authors")
 def get_authors():
     """ Функция возвращает все цитаты из БД. """
-    quotes_db = db.session.scalars(db.select(AuthorModel)).all()
+    authors_db = db.session.scalars(db.select(AuthorModel)).all()
     
     # Формируем список словарей
-    quotes = []
-    for quote in quotes_db:
-        quotes.append(quote.to_dict())
-    return jsonify(quotes), 200
+    #quotes = []
+    #for quote in quotes_db:
+    #    quotes.append(quote.to_dict())
+    #return jsonify(quotes), 200
+    return jsonify(authors_schema.dump(authors_db)),200
 
-@app.get("/author/<int:author_id>")
+@app.get("/authors/<int:author_id>")
 def get_author_by_id(author_id: int):
     """ Return quote by id from db."""
-    quote = db.get_or_404(entity=AuthorModel, ident=author_id, description=f"Quote with id={author_id} not found")
+    quote = db.get_or_404(entity=AuthorModel, ident=author_id, description=f"author with id={author_id} not found")
     return jsonify(quote.to_dict()), 200
 
 
@@ -44,7 +46,7 @@ def get_author_by_id(author_id: int):
 @app.put("/authors/<int:authors_id>")
 def edit_authors(authors_id: int):
     new_data = request.json
-    author = db.get_or_404(entity=AuthorModel, ident=authors_id, description=f"Quote with id={authors_id} not found")
+    author = db.get_or_404(entity=AuthorModel, ident=authors_id, description=f"author with id={authors_id} not found")
     for key_as_attr, value in new_data.items():
         setattr(author, key_as_attr, value)
     db.session.commit()
