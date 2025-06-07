@@ -60,12 +60,22 @@ def get_quotes_count() -> int:
 def edit_quote(quote_id: int):
     """TODO. Update edit using ma """
     #new_data = request.json
-    new_data = change_quotes_without_rating.load(request.json, unknown=EXCLUDE,)
+    try:
+        new_data = change_quotes_without_rating.load(request.json, unknown=EXCLUDE,)
+    except ValidationError as ve:
+        return abort(400, f"Validation error: {str(ve)}.")
+    if not new_data: 
+        return abort(400, "No valid data to update.")
     quote = db.get_or_404(entity=QuoteModel, ident=quote_id, description=f"Author with id={quote_id} not found")
-    for key_as_attr, value in new_data.items():
-        setattr(quote, key_as_attr, value)
-    db.session.commit()
-    return jsonify(quote_schema.dump(quote)), 200
+    try:
+        for key_as_attr, value in new_data.items():
+            setattr(quote, key_as_attr, value)
+        db.session.commit()
+        return jsonify(quote_schema.dump(quote)), 200
+    
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        abort(503, f"Database error: {str(e)}")
 
 
 
