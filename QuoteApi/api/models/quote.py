@@ -3,7 +3,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import String, ForeignKey
 
 
-
 class QuoteModel(db.Model):
     __tablename__ = 'quotes'
 
@@ -11,7 +10,7 @@ class QuoteModel(db.Model):
     author_id: Mapped[str] = mapped_column(ForeignKey('authors.id'))
     author: Mapped['AuthorModel'] = relationship(back_populates='quotes') # type: ignore
     text: Mapped[str] = mapped_column(String(255))
-    rating: Mapped[int] = mapped_column(default = "1",server_default="1")
+    rating: Mapped[int] = mapped_column(default='1', server_default="1")
 
     def __init__(self, author, text, rating=1):
         self.author = author

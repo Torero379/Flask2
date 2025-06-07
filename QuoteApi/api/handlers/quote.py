@@ -1,3 +1,4 @@
+from marshmallow import ValidationError, EXCLUDE
 from api import db, app
 from flask import abort, jsonify, request
 from api.models.quote import QuoteModel
@@ -5,15 +6,14 @@ from api.models.author import AuthorModel
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError, InvalidRequestError
 from . import check
-from api.schemas.quote import quote_schema, quotes_schema
+from api.schemas.quote import quote_schema, quotes_schema,change_quotes_without_rating
 
-@app.get("/quotes") ##+
+
+@app.get("/quotes")
 def get_quotes():
     """ Функция возвращает все цитаты из БД. """
-    quotes_db = db.session.scalars(db.select(QuoteModel)).all()
-    # Формируем список словарей
-
-    return jsonify(quotes_schema.dump(quotes_db)),200
+    quotes = db.session.scalars(db.select(QuoteModel)).all()
+    return jsonify(quotes_schema.dump(quotes)), 200
 
 
 # URL: "/authors/<int:author_id>/quotes"
@@ -22,24 +22,30 @@ def author_quotes(author_id: int):
     author = db.get_or_404(AuthorModel, author_id, description=f"Author with id={author_id} not found")
 
     if request.method == "GET":
-        quotes = [quote.to_dict() for quote in author.quotes]
-        return jsonify({"author": author.name} | {"quotes": quotes}), 200
+        return jsonify({"author": author.name, "quotes": quotes_schema.dump(list(author.quotes))}), 200
 
     elif request.method == "POST":
-        data = request.json
-        new_quote = QuoteModel(author, **data)
-        db.session.add(new_quote)
-        db.session.commit()
-        return jsonify(new_quote.to_dict() | { "author_id" : author.id}), 201
+        try:
+            data = quote_schema.loads(request.data)
+            new_quote = QuoteModel(author, **data)
+            db.session.add(new_quote)
+            db.session.commit()
+        except ValidationError as ve:
+            abort(400, f"{ve.messages_dict}")
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            abort(503, f"Database error: {str(e)}")
+       
+        return jsonify(quote_schema.dump(new_quote)), 201
     else:
         abort(405)
 
 
-@app.get("/quotes/<int:quote_id>")  ##|+
+@app.get("/quotes/<int:quote_id>")
 def get_quote_by_id(quote_id: int):
     """ Return quote by id from db."""
     quote = db.get_or_404(entity=QuoteModel, ident=quote_id, description=f"Quote with id={quote_id} not found")
-    return jsonify(quote_schema.dump(quote)),200
+    return jsonify(quote_schema.dump(quote)), 200
 
 
 
@@ -50,47 +56,40 @@ def get_quotes_count() -> int:
     return jsonify(count=count), 200
 
 
-@app.post("/quotes")
-def create_quote():
-    """ Function creates new quote and adds it to db."""
-    
-    try:
-        quote = quote_schema.load(request.json)
-        
-        db.session.add(quote)
-        db.session.commit()
-    except TypeError:
-        abort(400, f"Invalid data. Required: <author> and <text>. Received: {', '.join(quote.keys())}")
-    except Exception as e:
-        abort(503, f"Database error: {str(e)}")
-    
-    return jsonify(quote_schema.dump(quote)), 201  
-   
-
-
 @app.put("/quotes/<int:quote_id>")
 def edit_quote(quote_id: int):
-    """ Update an existing quote """
-    new_data = request.json
-    result = check(new_data, check_rating=True)
-    if not result[0]:
-        return abort(400, result[1].get('error'))
+    """TODO. Update edit using ma """
+    #new_data = request.json
+    new_data = change_quotes_without_rating.load(request.json, unknown=EXCLUDE,)
+    quote = db.get_or_404(entity=QuoteModel, ident=quote_id, description=f"Author with id={quote_id} not found")
+    for key_as_attr, value in new_data.items():
+        setattr(quote, key_as_attr, value)
+    db.session.commit()
+    return jsonify(quote_schema.dump(quote)), 200
+
+
+
+
+    # result = check(new_data, check_rating=True)
+    # if not result[0]:
+    #     return abort(400, result[1].get('error'))
     
-    quote = db.get_or_404(entity=QuoteModel, ident=quote_id, description=f"Quote with id={quote_id} not found")
+    # quote = db.get_or_404(entity=QuoteModel, ident=quote_id, description=f"Quote with id={quote_id} not found")
 
-    try:
-        for key_as_attr, value in new_data.items():
-            setattr(quote, key_as_attr, value)
+    # try:
+    #     for key_as_attr, value in new_data.items():
+    #         setattr(quote, key_as_attr, value)
 
-        db.session.commit()
-        return jsonify(quote.to_dict()), 200
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        abort(503, f"Database error: {str(e)}")
+    #     db.session.commit()
+    #     return jsonify(quote.to_dict()), 200
+    # except SQLAlchemyError as e:
+    #     db.session.rollback()
+    #     abort(503, f"Database error: {str(e)}")
 
 
 @app.route("/quotes/<int:quote_id>", methods=['DELETE'])
 def delete_quote(quote_id):
+    """Delete quote by id """
     quote = db.get_or_404(entity=QuoteModel, ident=quote_id, description=f"Quote with id={quote_id} not found")
     db.session.delete(quote)
     try:
@@ -109,6 +108,4 @@ def filter_quotes():
     except InvalidRequestError:
         abort(400, f"Invalid data. Required: <author> and <text>. Received: {', '.join(data.keys())}")
     
-    return jsonify([quote.to_dict() for quote in quotes]), 200
-
-
+    return jsonify(quotes_schema.dump(quotes)), 200
